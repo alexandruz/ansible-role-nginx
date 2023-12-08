@@ -41,6 +41,10 @@
   notify:
     - reload nginx
 
+- name: Check nginx config
+  shell: |
+    sudo /usr/sbin/nginx -t
+
 - name: Ensure nginx service is running as configured.
   service:
     name: nginx
