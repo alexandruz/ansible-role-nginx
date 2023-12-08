@@ -6,8 +6,62 @@
     nginx_use_ppa: true
     nginx_remove_default_vhost: true
     nginx_vhosts:
-      - server_name: "test.dev"
-        root: "/var/www/test"
+    nginx_vhosts:
+      - listen: "80"
+        server_name: "_"
+        root: "/fossid/webapp/www"
+        index: "index.html"
+        state: "present"
+        template: "{{ nginx_vhost_template }}"
+        filename: "fossid.conf"
+        extra_parameters: |
+          add_header X-Frame-Options "DENY";
+          add_header X-XSS-Protection "1; mode=block";
+          add_header X-Content-Type-Options "nosniff";
+
+          absolute_redirect: off
+
+          location = /health-check {
+              rewrite ^/health-check$ /index.php?check_health last;
+          }
+          location ~ ^/(webapp/)?(index|api|api_upload_endpoint)\.php$ {
+              if ($request_method = POST) {
+                  rewrite .* /index.php last;
+              }
+              rewrite .* /index.php redirect;
+          }
+          location /webapp/ {
+              rewrite /webapp/(.*) /$1 redirect;
+          }
+          location /images/ {
+              log_not_found off;
+              etag off;
+          }
+          location ~ /(compiled|external|script|style)/ {
+              etag off;
+          }
+          location ~* \.map$ {
+              log_not_found off;
+          }
+
+          location ~ /nui {
+              rewrite ^(.*)/nui$ $1/react/index.html last;
+              rewrite ^(.*)/nui/assets/(.*)$ $1/react/assets/$2;
+
+              rewrite ^(.*)/nui(/.*nui)(/.*).(js|svg|gif|ttf|png)$ $1/react$3.$4 last;
+              rewrite ^(.*)/nui(/.*).(js|svg|gif|ttf|png)$ $1/react$2.$3 last;
+
+              rewrite ^(.*)/nui(/.*)$ $1/react/index.html last;
+          }
+
+          location = /index.php {
+              fastcgi_pass 127.0.0.1:9000;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              fastcgi_param SCRIPT_NAME $fastcgi_script_name;
+          }
+    nginx_client_max_body_size: "64m"
+
 
   pre_tasks:
     - name: Update apt cache.
